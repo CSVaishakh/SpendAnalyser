@@ -45,3 +45,7 @@ cd backend && uv run pytest
 Statement files (CSV, XLS/XLSX, PDF, …) and the database are deliberately kept out of this repository by `.gitignore`. Tests that need a sample statement are skipped unless you place one at `backend/tests/sample_statement.csv`.
 
 Data is stored in `backend/data/spend.db`. To change the location, set `SPEND_DATA_DIR`.
+
+## License
+
+[MIT](LICENSE)
