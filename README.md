@@ -2,6 +2,8 @@
 
 Cashflow and payee analytics for Indian bank statements. A Python (FastAPI) backend reads the statements and stores them in a local SQLite database. A Next.js frontend shows the dashboard. Nothing leaves your machine.
 
+![Spend Analyser overview dashboard, showing a synthetic sample statement](docs/screenshot.png)
+
 ## Run
 
 ```bash
