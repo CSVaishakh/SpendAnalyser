@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spend Analyser</title>
+<link rel="stylesheet" href="css/styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <span>Spend Analyser</span>
+  </div>
+  <div class="topbar-actions">
+    <span class="privacy" title="Files are read in your browser. Nothing is uploaded.">● Processed locally</span>
+    <label class="btn btn-primary">
+      <input type="file" id="fileInput" accept=".csv,.txt,text/csv" multiple hidden>
+      Add statement
+    </label>
+    <button class="btn btn-ghost" id="clearBtn" hidden>Clear</button>
+    <button class="btn btn-icon" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">◐</button>
+  </div>
+</header>
+
+<main>
+  <!-- Empty state -->
+  <section id="empty" class="empty">
+    <div class="drop" id="dropZone">
+      <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true"><path d="M12 15V3m0 0L7 8m5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h1>Drop your account statement CSV</h1>
+      <p>Expected columns: Sl. No., Tran Date, Particulars, Value Date, Tran Type, Cheque Details, Withdrawal, Deposit, Balance Amount. Preamble rows above the header and wrapped narration lines are handled. You can add several statements and they'll be merged and de-duplicated.</p>
+      <div class="drop-actions">
+        <label class="btn btn-primary"><input type="file" id="fileInput2" accept=".csv,.txt,text/csv" multiple hidden>Choose file</label>
+        <button class="btn" id="sampleBtn">Load sample statement</button>
+      </div>
+      <p class="muted small" id="loadError" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- Dashboard -->
+  <section id="dash" hidden>
+    <div class="filters">
+      <div class="seg" id="presets" role="group" aria-label="Date range">
+        <button data-range="all" class="on">All</button>
+        <button data-range="1m">Last month</button>
+        <button data-range="3m">3 months</button>
+        <button data-range="6m">6 months</button>
+        <button data-range="12m">12 months</button>
+      </div>
+      <label class="field"><span>From</span><input type="date" id="fromDate"></label>
+      <label class="field"><span>To</span><input type="date" id="toDate"></label>
+      <label class="field grow"><span>Search</span><input type="search" id="search" placeholder="Payee, narration, category…"></label>
+      <div class="files muted small" id="fileInfo"></div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="overview" class="on">Overview</button>
+      <button role="tab" data-tab="payees">Payees &amp; entities</button>
+      <button role="tab" data-tab="txns">Transactions</button>
+      <button role="tab" data-tab="rules">Rules</button>
+    </nav>
+
+    <!-- Overview -->
+    <div class="tab" id="tab-overview">
+      <div class="grid">
+        <article class="card span-2">
+          <header><h2>Monthly cashflow</h2><p class="muted">Money in vs money out per month</p></header>
+          <div class="legend"><span><i class="sw in"></i>Money in</span><span><i class="sw out"></i>Money out</span></div>
+          <div class="chart h300"><canvas id="cMonthly"></canvas></div>
+        </article>
+        <article class="card span-2">
+          <header><h2>Account balance</h2><p class="muted">End-of-day balance from the statement</p></header>
+          <div class="chart h240"><canvas id="cBalance"></canvas></div>
+        </article>
+        <article class="card">
+          <header><h2>Top payees</h2><p class="muted">Where money went — click a bar for details</p></header>
+          <div class="chart" id="topPayeesWrap"><canvas id="cPayees"></canvas></div>
+        </article>
+        <article class="card">
+          <header><h2>Spend by category</h2><p class="muted">Outflow grouped by category</p></header>
+          <div class="chart" id="catWrap"><canvas id="cCategory"></canvas></div>
+        </article>
+        <article class="card">
+          <header><h2>Payment channel</h2><p class="muted">Outflow by UPI, NEFT, card, cash…</p></header>
+          <div class="chart" id="chanWrap"><canvas id="cChannel"></canvas></div>
+        </article>
+        <article class="card">
+          <header><h2>Spend by weekday</h2><p class="muted">Total outflow per day of week</p></header>
+          <div class="chart h240"><canvas id="cWeekday"></canvas></div>
+        </article>
+        <article class="card span-2">
+          <header><h2>Largest payments</h2><p class="muted">The ten biggest withdrawals in range</p></header>
+          <div class="table-wrap"><table class="tbl" id="bigTable"></table></div>
+        </article>
+      </div>
+    </div>
+
+    <!-- Payees -->
+    <div class="tab" id="tab-payees" hidden>
+      <div class="toolbar">
+        <div class="seg" id="entDir" role="group" aria-label="Direction">
+          <button data-dir="out" class="on">Paid to</button>
+          <button data-dir="in">Received from</button>
+          <button data-dir="all">All</button>
+        </div>
+        <select id="entCat" aria-label="Category"><option value="">All categories</option></select>
+        <span class="muted small" id="entCount"></span>
+        <button class="btn btn-sm" id="entExport">Export CSV</button>
+      </div>
+      <div class="table-wrap card flush"><table class="tbl sortable" id="entTable"></table></div>
+    </div>
+
+    <!-- Transactions -->
+    <div class="tab" id="tab-txns" hidden>
+      <div class="toolbar">
+        <div class="seg" id="txDir" role="group" aria-label="Direction">
+          <button data-dir="all" class="on">All</button>
+          <button data-dir="out">Withdrawals</button>
+          <button data-dir="in">Deposits</button>
+        </div>
+        <select id="txCat" aria-label="Category"><option value="">All categories</option></select>
+        <select id="txChan" aria-label="Channel"><option value="">All channels</option></select>
+        <span class="muted small" id="txCount"></span>
+        <button class="btn btn-sm" id="txExport">Export CSV</button>
+      </div>
+      <div class="table-wrap card flush"><table class="tbl sortable" id="txTable"></table></div>
+      <div class="pager" id="txPager"></div>
+    </div>
+
+    <!-- Rules -->
+    <div class="tab" id="tab-rules" hidden>
+      <article class="card">
+        <header><h2>Entity &amp; category rules</h2>
+          <p class="muted">Rules run top to bottom; the first match wins. <b>Match</b> is a case-insensitive piece of text from the narration or detected payee name, or a <code>/regex/</code>. Renaming or merging a payee from its detail panel adds a rule here. Rules are saved in this browser.</p></header>
+        <table class="tbl rules" id="rulesTable"></table>
+        <div class="toolbar">
+          <button class="btn btn-sm" id="addRule">Add rule</button>
+          <button class="btn btn-sm" id="exportRules">Export rules</button>
+          <label class="btn btn-sm"><input type="file" id="importRules" accept=".json" hidden>Import rules</label>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<!-- Entity drawer -->
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="dTitle">
+  <header class="drawer-head">
+    <div>
+      <p class="muted small" id="dCat"></p>
+      <h2 id="dTitle"></h2>
+    </div>
+    <button class="btn btn-icon" id="dClose" aria-label="Close">✕</button>
+  </header>
+  <div class="drawer-body">
+    <div class="mini-kpis" id="dKpis"></div>
+    <section>
+      <h3>Monthly payments</h3>
+      <div class="legend"><span><i class="sw out"></i>Paid</span><span><i class="sw in"></i>Received</span></div>
+      <div class="chart h200"><canvas id="cEntity"></canvas></div>
+    </section>
+    <section class="edit-entity">
+      <h3>Rename, merge or recategorise</h3>
+      <p class="muted small">Give two payees the same name to merge them. Applies to every matching transaction.</p>
+      <div class="edit-row">
+        <input id="dName" list="entityNames" aria-label="Payee name">
+        <datalist id="entityNames"></datalist>
+        <input id="dCategory" list="categoryNames" aria-label="Category">
+        <datalist id="categoryNames"></datalist>
+        <button class="btn btn-primary btn-sm" id="dSave">Save</button>
+      </div>
+    </section>
+    <section>
+      <h3>Narrations seen</h3>
+      <ul class="variants" id="dVariants"></ul>
+    </section>
+    <section>
+      <h3>Transactions</h3>
+      <div class="table-wrap"><table class="tbl" id="dTable"></table></div>
+    </section>
+  </div>
+</aside>
+
+<div class="tooltip-ext" id="toast" role="status" hidden></div>
+
+<script src="js/parser.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

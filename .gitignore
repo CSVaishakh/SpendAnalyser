@@ -1,0 +1,38 @@
+# Your imported statements and data live here — never commit them.
+backend/data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite*
+
+# Statement files of any kind, anywhere in the repo
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.xlsm
+*.ods
+*.pdf
+*.ofx
+*.qfx
+*.qif
+*statement*.html
+sample/
+statements/
+
+# Secrets
+.env
+.env.*
+
+# Python
+backend/.venv/
+__pycache__/
+.pytest_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.next-build/
+
+# OS
+.DS_Store
